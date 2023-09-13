@@ -1,0 +1,106 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+    <title>Trivia Game</title>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Trivia Game</h1>
+        <div id="question-container">
+            <h2>Question:</h2>
+            <p id="question"></p>
+            <ul id="choices"></ul>
+        </div>
+        <div id="timer-container">
+            <h2>Time Left:</h2>
+            <p id="timer"></p>
+        </div>
+        <div id="results-container" style="display: none;">
+            <h2>Results:</h2>
+            <ul id="results"></ul>
+        </div>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script type="text/javascript">
+        var socket = io.connect('http://' + document.domain + ':' + location.port);
+
+        socket.on('question', function(data) {
+            displayQuestion(data);
+            startTimer(data.round_duration);
+        });
+
+        socket.on('results', function(data) {
+            displayResults(data);
+        });
+
+        socket.on('answer', function(data) {
+            if (data.response === 'correct') {
+                // Handle correct answer
+                document.getElementById('question').innerText = 'Correct!';
+            } else if (data.response === 'incorrect') {
+                // Handle incorrect answer
+                document.getElementById('question').innerText = 'Incorrect!';
+            }
+            // Disable further clicking on choices
+            var choicesList = document.getElementById('choices');
+            var choices = choicesList.getElementsByTagName('li');
+            for (var i = 0; i < choices.length; i++) {
+                choices[i].removeEventListener('click', handleChoiceClick);
+            }
+        });
+
+        function handleChoiceClick(event) {
+            var choice = event.target.innerText;
+            socket.emit('answer', { answer: choice });
+        }
+
+        function displayQuestion(questionData) {
+            var question = questionData.question;
+            var round_duration = questionData.round_duration;
+
+            document.getElementById('question').innerText = question; // Access the question text
+            var choicesList = document.getElementById('choices');
+            choicesList.innerHTML = '';
+
+            questionData.choices.forEach(function(choice) {
+                var li = document.createElement('li');
+                li.innerText = choice;
+                li.addEventListener('click', function() {
+                    socket.emit('answer', { answer: choice });
+                });
+                choicesList.appendChild(li);
+            });
+
+            startTimer(round_duration); // Start the timer for the current question
+        }
+
+        function startTimer(round_duration) {
+            var timer = document.getElementById('timer');
+            var seconds = round_duration;
+            var countdown = setInterval(function() {
+                timer.innerText = seconds + ' seconds';
+                seconds--;
+                if (seconds < 0) {
+                    clearInterval(countdown);
+                    timer.innerText = 'Time\'s up!';
+                    socket.emit('answer', { answer: 'Time\'s up!' }); // Handle time's up as an answer
+                }
+            }, 1000);
+        }
+
+        function displayResults(results) {
+            document.getElementById('timer-container').style.display = 'none';
+            document.getElementById('question-container').style.display = 'none';
+            document.getElementById('results-container').style.display = 'block';
+
+            var resultsList = document.getElementById('results');
+            for (var choice in results) {
+                var li = document.createElement('li');
+                li.innerText = choice + ': ' + results[choice] + ' votes';
+                resultsList.appendChild(li);
+            }
+        }
+    </script>
+</body>
+</html>
