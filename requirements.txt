@@ -17,3 +17,4 @@ zipp==3.8.1
 gevent
 gunicorn
 eventlet
+requests
